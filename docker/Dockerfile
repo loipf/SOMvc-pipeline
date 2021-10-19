@@ -35,7 +35,7 @@ RUN mv somaticCombiner.jar /usr/src/somaticCombiner.jar
 ### install Conpair (master from Apr 3 2020) https://github.com/nygenome/Conpair
 RUN wget https://github.com/nygenome/Conpair/archive/144be0aecd97c289b095230c09c11e12665a1dae.zip -O conpair.zip
 RUN unzip conpair.zip
-RUN mv -r Conpair-* /usr/src/conpair
+RUN mv Conpair-* /usr/src/conpair
 
 
 
