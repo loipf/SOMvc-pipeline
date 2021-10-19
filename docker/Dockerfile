@@ -17,8 +17,8 @@ RUN conda install \
 		strelka==2.9.10 \
 		manta==1.6.0 \
 		samtools==1.12.0
-RUN conda install -y numpy scipy
-RUN conda install r-base==3.6.3 r-essentials
+RUN conda install -y numpy==1.16.5 scipy==1.2.1
+RUN conda install r-base==3.2.2 r-essentials
 
 
 ### download VarDictJava - faster than perl conda version
