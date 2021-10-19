@@ -27,36 +27,6 @@ process INDEX_REFERENCE {
 
 
 
-process SOMATICSEQ_CALLING { 
-	container "somvc-pipeline:latest"
-	tag "$sample_id"
-	publishDir "$params.data_dir/somaticseq", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
-
-	input:
-		//tuple val(sample_id), tuple(normal_file, tumor_file)
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
-		path reference_genome
-
-	output:
-		//path "${sample_id}.bam.bai", emit: reads_mapped_index
-		path "*", emit: all
-
-
-	script:
-	"""
-	cp -r /usr/src/neusomatic/ensemble_docker_pipelines .
-	chmod -R 777 ensemble_docker_pipelines
-	
-	bash ensemble_docker_pipelines/prepare_callers_scripts.sh --normal-bam $normal_file --tumor-bam $tumor_file --human-reference $reference_genome --output-dir varcaller_commands --splits 10 --mutect2 --somaticsniper --vardict --varscan2 --strelka --wrapper
-
-
-
-
-	"""
-}
-
-
 process SOMVC_LOFREQ { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/vc_caller/lofreq", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
@@ -166,7 +136,7 @@ process SOMVC_VARDICT {
 	'''
 	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b !{tumor_file}|!{normal_file} -Q 5 -th !{num_threads}
 
-#	 /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M vars.txt ?
+#	 /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M vars.txt ? ### TODO CHECK
 
 
 	gatk VariantFiltration -R !{reference_genome} -V input.vcf.gz -O output.vcf.gz --filterName "bcbio_advised" \

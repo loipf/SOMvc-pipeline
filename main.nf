@@ -80,8 +80,18 @@ workflow {
 
 	INDEX_REFERENCE(params.reference_genome)
 
-	SOMATICSEQ_CALLING(channel_sample_match, INDEX_REFERENCE.out.reference_genome)
+	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
+	SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.num_threads)
+	SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.num_threads)
+	SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.num_threads)
 
+
+
+	//SOMATIC_COMBINER;
+	//CONPAIR_CONTAMINATION;
+	//VARIANT_CALLING_STATS;
+	//MULTIQC_VCF;
+	//VARIANT_ANNOTATION;
 
 	//VARIANT_CALLING(channel_reads_mapped, params.num_threads, INDEX_REFERENCE.out.reference_genome)
 	//VARIANT_CALLING_STATS(VARIANT_CALLING.out.vcf, params.num_threads)
