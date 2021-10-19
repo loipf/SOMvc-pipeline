@@ -12,7 +12,7 @@ process INDEX_REFERENCE {
 		path reference_genome
 
 	output:
-		tuple path("*.fa"), path("*.fa.fai"),path("*.dict"), emit: reference_genome
+		tuple path("*.fa"), path("*.fa.fai"), path("*.dict"), emit: reference_genome
 
 	shell:
 	'''
@@ -134,18 +134,15 @@ process SOMVC_VARDICT {
 
 	shell:
 	'''
-	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b !{tumor_file}|!{normal_file} -Q 5 -th !{num_threads}
+	### weird C writing error introducing empty bytes - deleted with tr
+	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
-#	 /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M vars.txt ? ### TODO CHECK
-
-
-	gatk VariantFiltration -R !{reference_genome} -V input.vcf.gz -O output.vcf.gz --filterName "bcbio_advised" \
-			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
+# -R chr7:50000-200000
 
 	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
+	gatk VariantFiltration -R !{reference_genome} -V vardict_output.vcf -O vardict_output_filtered.vcf --filterName "bcbio_advised" \
+			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
 
-# var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M” and 
-# filtered with “((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))” using GATK VariantFiltration module according to the setting used by Bcbio.
 
 # check
 #AF THR="0.01"
