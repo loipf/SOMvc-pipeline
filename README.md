@@ -7,10 +7,11 @@ a variant calling pipeline from matched normal-tumor `.bam` files to `.vcf` file
 ### set up pipeline
 
 
-before running, you have to set up the attached Docker images:
+before running, you have to set up the attached Docker images, DNAvc-pipeline docker image can take some time:
 ```sh
-docker pull msahraeian/neusomatic:0.2.1
 docker build -t somvc-pipeline https://raw.githubusercontent.com/loipf/SOMvc-pipeline/master/docker/Dockerfile
+docker build -t dnavc-pipeline https://raw.githubusercontent.com/loipf/DNAvc-pipeline/master/docker/Dockerfile
+
 ```
 
 now either replace the Docker container hash (last output line from previous build command) in `nextflow.config` or run nextflow with the `-with-docker somvc-pipeline` argument.

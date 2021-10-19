@@ -12,7 +12,7 @@ process INDEX_REFERENCE {
 		path reference_genome
 
 	output:
-		tuple path("*.fa"), path("*.fa.fai"), emit: reference_genome
+		tuple path("*.fa"), path("*.fa.fai"),path("*.dict"), emit: reference_genome
 
 	shell:
 	'''
@@ -21,11 +21,10 @@ process INDEX_REFERENCE {
 
 	gunzip -c !{reference_genome} > $reference_name 
 	samtools faidx $reference_name -o $reference_name.fai
+	samtools dict $reference_name -o $reference_name.dict
 	'''
 }
 
-// data aquisition dbsnp
-//https://ftp.ncbi.nih.gov/snp/archive/b154/VCF/GCF_000001405.38.gz
 
 
 process SOMATICSEQ_CALLING { 
@@ -188,53 +187,132 @@ process SOMVC_VARDICT {
 }
 
 
-
-process TEST { 
+process SOMATIC_COMBINER { 
 	tag "$sample_id"
-	publishDir "$params.data_dir/somaticseq", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
+	publishDir "$params.data_dir/vc_caller/somatic_combiner", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
 	cache false
 
 	input:
-		//tuple val(sample_id), tuple(normal_file, tumor_file)
 		tuple val(sample_id), path(normal_file), path(tumor_file) 
 		path reference_genome
+		val num_threads
+		path lofreq_indel_vcf
+		path lofreq_snv_vcf
+		path mutect2_vcf
+		path strelka_indel_vcf
+		path strelka_snv vcf
+		path vardict_vcf
 
 	output:
-		//path "${sample_id}.bam.bai", emit: reads_mapped_index
-		path "*", emit: all
+		path "*", emit: somatic_combiner_vcf
 
 
 	shell:
 	'''
-	# cd ./neusomatic/ensemble_docker_pipelines
-
-	echo !{sample_id}
-	echo !{normal_file}
-
-	#bash prepare_callers_scripts.sh --normal-bam !{mapping_files[0]} --tumor-bam /home/stefan/Documents/umcg/somatic_test/cancer_reads_mapped/DRR023395/DRR023395.bam --human-reference /home/stefan/Documents/umcg/dna-seq_pipeline/data/Homo_sapiens.GRCh38.dna.primary_assembly.fa --output-dir /home/stefan/Documents/umcg/somatic_test/output --splits 10 --mutect2 --somaticsniper --vardict --varscan2 --strelka --wrapper
-
-	#cp -r /bin/neusomatic/ensemble_docker_pipelines .
-	#ls -alFh ensemble_docker_pipelines
-	#chmod 777 ensemble_docker_pipeline	
-	#ls -alFh ensemble_docker_pipelines
-
-
-	#bash ensembl_docker_pipelines/prepare_callers_scripts.sh --normal-bam !{normal_file}
-
-
-	#NEUSOMATIC_PREPRO --normal-bam
-	
-	#docker cp -r somvc-pipeline:latest ./neusomatic/ensemble_docker_pipelines .
-	#cd ./neusomatic/ensemble_docker_pipelines
-
-	#echo !{sample_id}
-	#echo !{normal_file}
-
-
-	#neusomatic/ensemble_docker_pipelines/prepare_callers_scripts.sh --normal-bam !{normal_file}
+	java -jar /usr/src/somaticCombiner.jar -L ${lofreq_indel_vcf} -l ${lofreq_snv_vcf} -M ${mutect2_vcf} -s ${strelka_snv} -S ${strelka_indel_vcf} -D ${vardict_vcf} -o somatic_combiner_vcf.vcf
 
 	'''
 }
+
+
+
+
+process CONPAIR_CONTAMINATION { 
+	tag "$sample_id"
+	publishDir "$params.data_dir/conpair", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
+	cache false
+
+	input:
+		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		path reference_genome
+		val num_threads
+
+	output:
+		path "*", emit: conpair_info
+
+	shell:
+	'''
+	MARKER_FILE="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
+
+	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B !{tumor_file} -O tumor_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
+
+	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B {normal_file} -O normal_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
+
+
+	/usr/src/conpair/scripts/verify_concordance.py -T tumor_pileup -N normal_pileup --markers $MARKER_FILE --outfile concordance_stats.txt
+
+	/usr/src/conpair/scripts/estimate_tumor_normal_contamination.py -T tumor_pileup -N normal_pileup --markers $MARKER_FILE --outfile contamination_stats.txt
+
+	'''
+}
+
+
+
+process VARIANT_CALLING_STATS { 
+	container "dnavc-pipeline:latest"
+	tag "$sample_id"
+	publishDir "$params.data_dir/variants_vcf", mode: "copy", overwrite: false, saveAs: { filename -> "${sample_id}/$filename" }
+
+	input:
+		tuple val(sample_id), path(vcf_file), path(vcf_file_index) 
+		val num_threads
+
+	output:
+		path "${sample_id}_vcfstats.txt", emit: vcf_stats
+
+	shell:
+	'''
+	bcftools stats -f PASS --threads !{num_threads} !{vcf_file} > !{sample_id}_vcfstats.txt
+	'''
+}
+
+
+
+
+process VARIANT_ANNOTATION { 
+	container "dnavc-pipeline:latest"
+	publishDir "$params.data_dir/variants_vcf/_all", mode: "copy", overwrite: false
+
+	input:
+		path pvcf_glnexus
+		val num_threads
+
+	output:
+		path "*"
+
+	shell:
+	'''
+	oc run -l hg38 -t csv -x --mp !{num_threads} !{pvcf_glnexus}
+	'''
+}
+
+
+process MULTIQC_VCF { 
+	container "dnavc-pipeline:latest"
+	publishDir "$params.data_dir/quality_reports", mode: "copy"
+
+	input:
+		path stat_files
+
+	output:
+		path "*"
+
+	shell:
+	'''
+	multiqc -f -o variants_vcf .
+	'''
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
