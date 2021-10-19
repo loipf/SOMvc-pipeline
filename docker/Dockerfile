@@ -23,7 +23,7 @@ RUN conda install r-base==3.2.2 r-essentials
 
 ### download VarDictJava - faster than perl conda version
 RUN wget https://github.com/AstraZeneca-NGS/VarDictJava/releases/download/v1.8.2/VarDict-1.8.2.tar
-RUN tar -xf VarDict-1.8.2.tar -C /usr/src/VarDict-1.8.2
+RUN tar -xf VarDict-1.8.2.tar -C /usr/src/
 RUN rm VarDict-1.8.2.tar
 
 
