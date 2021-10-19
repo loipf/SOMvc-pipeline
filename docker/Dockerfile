@@ -7,7 +7,7 @@ MAINTAINER loipf
 #RUN apt-get update 
 #RUN conda update --all
 
-RUN apt-get update && apt install -y wget
+RUN apt-get update && apt install -y wget 
 
 RUN conda config --add channels defaults
 RUN conda config --add channels bioconda
@@ -19,9 +19,10 @@ RUN conda config --add channels conda-forge
 RUN conda install \
 		gatk4==4.2.2.0 \
 		lofreq==2.1.5 \
-		vardict==2019.06.04 \
 		strelka==2.9.10 \
+		manta==1.6.0 \
 		samtools==1.11.0 
+RUN conda install r-base==3.6.3 r-essentials
 
 # RUN pip install multiqc
 
@@ -31,6 +32,11 @@ RUN conda install \
 
 # SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
 
+
+### download VarDictJava - faster than perl conda version
+RUN wget https://github.com/AstraZeneca-NGS/VarDictJava/releases/download/v1.8.2/VarDict-1.8.2.tar
+RUN tar -xf VarDict-1.8.2.tar -C /usr/src/VarDict-1.8.2
+RUN rm VarDict-1.8.2.tar
 
 
 ### download SomaticCombiner

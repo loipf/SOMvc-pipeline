@@ -88,6 +88,15 @@ process SOMVC_LOFREQ {
 	## maybe: bedtools sort -i Homo_sapiens.GRCh38.cds.all.bed
 
 
+#Pre-processing:
+#lofreq indelqual --dindel -f Ref GRCh37.67.fasta -o sampleX q.bam sampleX.bam
+#samtools index -b sampleX q.bam > sampleX q.bai
+#Variant calling:
+#lofreq call --call-indels -f Ref GRCh37.67.fasta -o sampleX.vcf sampleX q.bam -s
+#-S dbSNP.polymorphisms.vcf.gz
+
+
+
 	'''
 }
 
@@ -107,7 +116,7 @@ process SOMVC_MUTECT2 {
 
 	shell:
 	'''
-	gatk Mutect2 -R !{reference_genome} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads -O mutect2_unfiltered.vcf
+	gatk Mutect2 -R !{reference_genome} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	'''
@@ -123,23 +132,60 @@ process SOMVC_STRELKA {
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file) 
 		path reference_genome
-		path bed_file
 		val num_threads
 
 	output:
-		path "*.vcf", emit: mutect2_vcf
+		path "*", emit: strelka_vcf
 
 
 	shell:
 	'''
-	gatk Mutect2 -R !{reference_genome} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads -O mutect2_unfiltered.vcf
-	gatk FilterMutectCalls -R !{reference_genome} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
+	configManta.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome} --runDir manta_dir
+	manta_dir/runWorkflow.py -m local -j !{num_threads}	
 
+	configureStrelkaSomaticWorkflow.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome} --exome --runDir strelka_dir --indelCandidates manta_dir/results/variants/candidateSmallIndels.vcf.gz
+	strelka_dir/runWorkflow.py -m local -j !{num_threads}
 	'''
 }
 
 
+process SOMVC_VARDICT { 
+	tag "$sample_id"
+	publishDir "$params.data_dir/vc_caller/vardict", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
+	cache false
 
+	input:
+		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		path reference_genome
+		val num_threads
+
+	output:
+		path "*", emit: vardict_vcf
+
+
+	shell:
+	'''
+	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b !{tumor_file}|!{normal_file} -Q 5 -th !{num_threads}
+
+#	 /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M vars.txt ?
+
+
+	gatk VariantFiltration -R !{reference_genome} -V input.vcf.gz -O output.vcf.gz --filterName "bcbio_advised" \
+			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
+
+	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
+
+# var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M” and 
+# filtered with “((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))” using GATK VariantFiltration module according to the setting used by Bcbio.
+
+# check
+#AF THR="0.01"
+#vardict -C -G Ref GRCh37.67.fasta -f $AF THR -N sampleX -b sampleX.bam -h -c 1 -S 2
+#-E 3 -g 4 target.bed > sampleX.txt
+
+
+	'''
+}
 
 
 
