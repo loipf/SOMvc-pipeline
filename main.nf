@@ -83,7 +83,7 @@ workflow {
 	//SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
 	//SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.num_threads)
 	//SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.num_threads)
-	//SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.num_threads)
+	//SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
 
 
 

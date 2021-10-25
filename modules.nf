@@ -126,6 +126,7 @@ process SOMVC_VARDICT {
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file) 
 		path reference_genome
+		path bed_file
 		val num_threads
 
 	output:
@@ -134,14 +135,21 @@ process SOMVC_VARDICT {
 
 	shell:
 	'''
-	### weird C writing error introducing empty bytes - deleted with tr
-	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
-
-# -R chr7:50000-200000
+	vardict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
 	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
 	gatk VariantFiltration -R !{reference_genome} -V vardict_output.vcf -O vardict_output_filtered.vcf --filterName "bcbio_advised" \
 			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
+
+	### weird C writing error introducing empty bytes - deleted with tr - ONLY WITH JAVA version
+#	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
+
+	# /usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} -z 1 -c 1 -S 2 -E 3 -g 4 !{bed_file} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
+
+#VarDict-1.8.2/bin/VarDict -G Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz -b "/home/stefanloipfinger/Documents/somvc_pipeline_test/baseline_reads_mapped/IMPACT_MBC1_001_BKDN190631707-1A_HTKWGDSXX_L2/IMPACT_MBC1_001_BKDN190631707-1A_HTKWGDSXX_L2.bam|/home/stefanloipfinger/Documents/somvc_pipeline_test/tumor_reads_mapped/IMPACT_MBC1_002_BKDN190631708-1A_HTKWGDSXX_L4/IMPACT_MBC1_002_BKDN190631708-1A_HTKWGDSXX_L4.bam" -Q 5 -th 1 -R Homo_sapiens_short.GRCh38.cds.all.bed -z 1 -c 1 -S 2 -E 3 -g 4| tr -d '\000' | VarDict-1.8.2/bin/testsomatic.R | VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -f 0.8 -M -N "tumur_sample|normal_sample" > vardict_output.vcf
+
+# -R chr7:50000-200000
+
 
 
 # check
