@@ -10,9 +10,11 @@ process INDEX_REFERENCE {
 
 	input:
 		path reference_genome
+		path bed_file
 
 	output:
 		tuple path("*.fa"), path("*.fa.fai"), path("*.dict"), emit: reference_genome
+		tuple path("*.bed.gz"), path("*.bed.gz.tbi"), emit: bed_file
 
 	shell:
 	'''
@@ -21,7 +23,10 @@ process INDEX_REFERENCE {
 
 	gunzip -c !{reference_genome} > $reference_name 
 	samtools faidx $reference_name -o $reference_name.fai
-	samtools dict $reference_name -o $reference_name.dict
+	samtools dict $reference_name -o ${reference_name%.*}.dict  # remove .fa so name is only .dict
+
+	bedtools sort -i !{bed_file} | bgzip -c > !{bed_file}_sorted.gz
+	tabix --zero-based -b 2 -e 3 !{bed_file}_sorted.gz
 	'''
 }
 
@@ -82,12 +87,14 @@ process SOMVC_MUTECT2 {
 		val num_threads
 
 	output:
-		path "*.vcf", emit: mutect2_vcf
+		path "*", emit: mutect2_vcf  
 
 	shell:
 	'''
 	gatk Mutect2 -R !{reference_genome} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
+
+	### TODO select only filtered output ? 
 
 	'''
 }
@@ -102,6 +109,7 @@ process SOMVC_STRELKA {
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file) 
 		path reference_genome
+		path bed_file
 		val num_threads
 
 	output:
@@ -113,7 +121,7 @@ process SOMVC_STRELKA {
 	configManta.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome} --runDir manta_dir
 	manta_dir/runWorkflow.py -m local -j !{num_threads}	
 
-	configureStrelkaSomaticWorkflow.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome} --exome --runDir strelka_dir --indelCandidates manta_dir/results/variants/candidateSmallIndels.vcf.gz
+	configureStrelkaSomaticWorkflow.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome} --exome --runDir strelka_dir --indelCandidates manta_dir/results/variants/candidateSmallIndels.vcf.gz --callRegions !{bed_file}
 	strelka_dir/runWorkflow.py -m local -j !{num_threads}
 	'''
 }
@@ -136,14 +144,14 @@ process SOMVC_VARDICT {
 
 	shell:
 	'''
-	vardict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
+	vardict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} !{bed_file} | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
 	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
 	gatk VariantFiltration -R !{reference_genome} -V vardict_output.vcf -O vardict_output_filtered.vcf --filterName "bcbio_advised" \
 			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
 
 	
-
+### TODO DELETE
 ### weird C writing error introducing empty bytes - deleted with tr - ONLY WITH JAVA version
 #	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
@@ -153,6 +161,7 @@ process SOMVC_VARDICT {
 
 # -R chr7:50000-200000
 
+#VarDict-1.8.2/bin/VarDict -G Homo_sapiens.GRCh38.dna.primary_assembly.fa -k 1 -b "/home/stefanloipfinger/Documents/somvc_pipeline_test/tumor_reads_mapped/IMPACT_MBC1_002_BKDN190631708-1A_HTKWGDSXX_L4/IMPACT_MBC1_002_chr17.bam|/home/stefanloipfinger/Documents/somvc_pipeline_test/baseline_reads_mapped/IMPACT_MBC1_001_BKDN190631707-1A_HTKWGDSXX_L2/IMPACT_MBC1_001_chr17.bam" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th 10 -R chr17:7500005-7599990 > vardict_output_all.vcf
 
 
 # check

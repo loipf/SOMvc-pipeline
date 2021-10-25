@@ -14,10 +14,11 @@ RUN conda config --add channels conda-forge
 RUN conda install \
 		gatk4==4.2.2.0 \
 		lofreq==2.1.5 \
-		strelka==2.9.10 \
 		manta==1.6.0 \
+		strelka==2.9.10 \
+		vardict==2019.06.04 \
 		samtools==1.12.0 \
-		vardict==2019.06.04
+		bedtools==2.30.0
 RUN conda install -y numpy==1.16.5 scipy==1.2.1
 RUN conda install r-base==3.2.2 r-essentials
 
