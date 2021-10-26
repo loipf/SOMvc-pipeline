@@ -71,7 +71,6 @@ process SOMVC_LOFREQ {
 #Variant calling:
 
 
-
 	'''
 }
 
@@ -84,6 +83,7 @@ process SOMVC_MUTECT2 {
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file) 
 		path reference_genome
+		path bed_file
 		val num_threads
 
 	output:
@@ -91,7 +91,7 @@ process SOMVC_MUTECT2 {
 
 	shell:
 	'''
-	gatk Mutect2 -R !{reference_genome} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} -O mutect2_unfiltered.vcf
+	gatk Mutect2 -R !{reference_genome} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} --intervals !{bed_file} -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	### TODO select only filtered output ? 
@@ -144,6 +144,9 @@ process SOMVC_VARDICT {
 
 	shell:
 	'''
+	# TODO !!!
+	#grep -v CHR Homo_sapiens.GRCh38.cds.all.bed > Homo_sapiens.GRCh38.cds.withoutSpecial.bed  ### vardict cant deal with weird CHR
+
 	vardict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} !{bed_file} | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
 	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
