@@ -223,11 +223,17 @@ process CONPAIR_CONTAMINATION {
 
 	shell:
 	'''
+	export CONPAIR_DIR=/usr/src/conpair  
+	export GATK_JAR=/usr/local/bin/gatk
+	export PYTHONPATH=${PYTHONPATH}:/usr/src/conpair/modules
+
+/usr/local/lib/python2.7/site-packages
+
 	MARKER_FILE="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
 
 	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B !{tumor_file} -O tumor_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
 
-	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B {normal_file} -O normal_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
+	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B !{normal_file} -O normal_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
 
 
 	/usr/src/conpair/scripts/verify_concordance.py -T tumor_pileup -N normal_pileup --markers $MARKER_FILE --outfile concordance_stats.txt
