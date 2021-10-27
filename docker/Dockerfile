@@ -2,7 +2,7 @@ FROM conda/miniconda2@sha256:d30ea858b9d3425127c2e835d39653cdca74368af832d65748c
 
 MAINTAINER loipf
 
-RUN apt-get update && apt install -y wget unzip
+RUN apt-get update && apt install -y wget unzip gzip
 
 RUN conda config --add channels defaults
 RUN conda config --add channels bioconda
@@ -30,7 +30,7 @@ RUN rm VarDict-1.8.2.tar
 
 
 ### download SomaticCombiner
-RUN wget https://github.com/mingyi-wang/somatic-combiner/blob/V1.02/example/somaticCombiner.jar
+RUN wget https://github.com/mingyi-wang/somatic-combiner/raw/master/example/somaticCombiner.jar
 RUN mv somaticCombiner.jar /usr/src/somaticCombiner.jar
 
 

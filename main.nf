@@ -80,14 +80,13 @@ workflow {
 
 	INDEX_REFERENCE(params.reference_genome)
 
-	//SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
-	//SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
-	//SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
-	//SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, params.bed_file, params.num_threads)
+	//SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	//SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	//SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	//SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
 
-
-	//SOMATIC_COMBINER;
+	//SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snv_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_vcf)
 	//CONPAIR_CONTAMINATION;
 	//VARIANT_CALLING_STATS;
 	//MULTIQC_VCF;

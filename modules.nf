@@ -44,7 +44,9 @@ process SOMVC_LOFREQ {
 		val num_threads
 
 	output:
-		path "*", emit: lofreq_vcf
+		path "*"
+		path "*", emit: lofreq_indel_vcf
+		path "*", emit: lofreq_snv_vcf
 
 	shell:
 	'''
@@ -87,6 +89,7 @@ process SOMVC_MUTECT2 {
 		val num_threads
 
 	output:
+		path "*"
 		path "*", emit: mutect2_vcf  
 
 	shell:
@@ -113,8 +116,9 @@ process SOMVC_STRELKA {
 		val num_threads
 
 	output:
-		path "*", emit: strelka_vcf
-
+		path "*"
+		path "*", emit: strelka_indel_vcf
+		path "*", emit: strelka_snv_vcf
 
 	shell:
 	'''
@@ -139,15 +143,15 @@ process SOMVC_VARDICT {
 		val num_threads
 
 	output:
+		path "*"
 		path "*", emit: vardict_vcf
 
 
-	shell:
+	shell: 
 	'''
-	# TODO !!!
-	#grep -v CHR Homo_sapiens.GRCh38.cds.all.bed > Homo_sapiens.GRCh38.cds.withoutSpecial.bed  ### vardict cant deal with weird CHR
+	gunzip -c !{bed_file} > bed_file_unzipped.bed   # vardict need unzipped
 
-	vardict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} !{bed_file} | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
+	vardict -G !{reference_genome} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} bed_file_unzipped.bed | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
 	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
 	gatk VariantFiltration -R !{reference_genome} -V vardict_output.vcf -O vardict_output_filtered.vcf --filterName "bcbio_advised" \
@@ -183,14 +187,11 @@ process SOMATIC_COMBINER {
 	cache false
 
 	input:
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
-		path reference_genome
-		val num_threads
 		path lofreq_indel_vcf
 		path lofreq_snv_vcf
 		path mutect2_vcf
 		path strelka_indel_vcf
-		path strelka_snv vcf
+		path strelka_snv_vcf
 		path vardict_vcf
 
 	output:

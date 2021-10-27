@@ -26,7 +26,7 @@ gunzip -c Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz | grep ">" | awk '{prin
 ### get common chromosomes between reference and coding seq bed and subset
 comm -12 <(awk '{print $1}' Homo_sapiens.GRCh38.dna.primary_assembly.bed | sort | uniq) <(awk '{print $1}' Homo_sapiens.GRCh38.cds.all.bed | sort | uniq) > common_both.txt
 
-### subset bed for only considered chromosomes
+### subset bed for only considered chromosomes - important for vardict + strelka
 Rscript -e 'write.table(subset(read.table("Homo_sapiens.GRCh38.cds.all.bed"), V1 %in% read.table("common_both.txt")$V1), "Homo_sapiens.GRCh38.cds.all_filtered.bed", col.names=F, quote=F, row.names=F, sep="\t")'
 rm common_both.txt
 
