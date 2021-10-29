@@ -216,29 +216,26 @@ process CONPAIR_CONTAMINATION {
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file) 
 		path reference_genome
-		val num_threads
 
 	output:
 		path "*", emit: conpair_info
 
 	shell:
 	'''
-	export CONPAIR_DIR=/usr/src/conpair  
-	export GATK_JAR=/usr/local/bin/gatk
-	export PYTHONPATH=${PYTHONPATH}:/usr/src/conpair/modules
 
-/usr/local/lib/python2.7/site-packages
+	MARKER_FILE_BED="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.bed"
+	sed -e 's/chr//g' $MARKER_FILE_BED > markers_GRCh38_snv_formatted.bed  ### rename chromosomes
 
-	MARKER_FILE="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
-
-	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B !{tumor_file} -O tumor_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
-
-	/usr/src/conpair/scripts/run_gatk_pileup_for_sample.py -B !{normal_file} -O normal_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers $MARKER_FILE
+	MARKER_FILE_TXT="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
+	sed -e 's/chr//g' $MARKER_FILE_TXT > markers_GRCh38_snv_formatted.txt  ### rename chromosomes
 
 
-	/usr/src/conpair/scripts/verify_concordance.py -T tumor_pileup -N normal_pileup --markers $MARKER_FILE --outfile concordance_stats.txt
+	run_gatk_pileup_for_sample.py -B !{tumor_file} -O tumor_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers markers_GRCh38_snv_formatted.bed
+	run_gatk_pileup_for_sample.py -B !{normal_file} -O normal_pileup --reference !{reference_genome} --conpair_dir /usr/src/conpair/ --markers markers_GRCh38_snv_formatted.bed
 
-	/usr/src/conpair/scripts/estimate_tumor_normal_contamination.py -T tumor_pileup -N normal_pileup --markers $MARKER_FILE --outfile contamination_stats.txt
+	verify_concordance.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile concordance_stats.txt
+
+	estimate_tumor_normal_contamination.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile contamination_stats.txt
 
 	'''
 }
@@ -290,6 +287,7 @@ process MULTIQC_VCF {
 
 	input:
 		path stat_files
+		path conpair_files
 
 	output:
 		path "*"

@@ -30,19 +30,16 @@ RUN rm VarDict-1.8.2.tar
 
 
 ### download SomaticCombiner
-RUN wget https://github.com/mingyi-wang/somatic-combiner/raw/master/example/somaticCombiner.jar
+RUN wget https://github.com/mingyi-wang/somatic-combiner/raw/03ebc539d9a037662fde42f05854b179d2249479/example/somaticCombiner.jar
 RUN mv somaticCombiner.jar /usr/src/somaticCombiner.jar
 
 
-### install Conpair (master from Apr 3 2020) https://github.com/nygenome/Conpair
-RUN wget https://github.com/nygenome/Conpair/archive/144be0aecd97c289b095230c09c11e12665a1dae.zip -O conpair.zip
+### install Conpair (compatible version with gatk4)
+RUN wget https://github.com/vladsaveliev/Conpair/archive/0f4d8fe8eb6d86f093ae4c75f0feb406311fb6a9.zip -O conpair.zip
 RUN unzip conpair.zip
 RUN mv Conpair-* conpair 
 RUN mv conpair /usr/src/
 RUN pip install /usr/src/conpair
-
-
-
 
 
 

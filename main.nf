@@ -87,14 +87,16 @@ workflow {
 
 
 	//SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snv_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_vcf)
-	//CONPAIR_CONTAMINATION;
+	//CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome);
+
+
 	//VARIANT_CALLING_STATS;
-	//MULTIQC_VCF;
+	//MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect(), CONPAIR_CONTAMINATION.out.conpair_info.collect())
+
 	//VARIANT_ANNOTATION;
 
 	//VARIANT_CALLING(channel_reads_mapped, params.num_threads, INDEX_REFERENCE.out.reference_genome)
 	//VARIANT_CALLING_STATS(VARIANT_CALLING.out.vcf, params.num_threads)
-	//MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect())
 	
 	//VARIANT_MERGING(VARIANT_CALLING.out.global_vcf.collect(), params.num_threads)
 	//GLNEXUS_BCF_TO_VCF(VARIANT_MERGING.out.glnexus_bcf, params.num_threads)
