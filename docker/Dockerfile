@@ -16,14 +16,14 @@ RUN conda install \
 		lofreq==2.1.5 \
 		manta==1.6.0 \
 		strelka==2.9.10 \
-		vardict==2019.06.04 \
 		samtools==1.12.0 \
-		bedtools==2.30.0
+		bedtools==2.30.0 \
+		vt==2015.11.10
 RUN conda install -y numpy==1.16.5 scipy==1.2.1
 RUN conda install r-base==3.2.2 r-essentials
 
 
-### download VarDictJava - faster than perl conda version - DOES NOT WORK BUT NEED /bin scripts
+### download VarDictJava - faster than perl conda version
 RUN wget https://github.com/AstraZeneca-NGS/VarDictJava/releases/download/v1.8.2/VarDict-1.8.2.tar
 RUN tar -xf VarDict-1.8.2.tar -C /usr/src/
 RUN rm VarDict-1.8.2.tar
