@@ -36,7 +36,7 @@ nextflow run main.nf
 or
 
 ```sh
-nextflow run loipf/DNAseq-pipeline -r main --project_dir /path/to/folder --reads_dir /path/to/samples --num_threads 10 --adapter_3_seq_file adapter_3.fasta --adapter_5_seq_file adapter_5.fasta --reference_genome genome.fasta -with-docker dnaseq-pipeline
+nextflow run loipf/DNAseq-pipeline -r main --project_dir /path/to/folder --reads_dir /path/to/samples --num_threads 10 --adapter_3_seq_file adapter_3.fasta --adapter_5_seq_file adapter_5.fasta --reference_genome genome.fasta --bed_file cds.bed -with-docker dnaseq-pipeline
 ```
 for this execution to work properly, you have to be in the current project directory.
 

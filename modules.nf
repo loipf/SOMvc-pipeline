@@ -256,9 +256,27 @@ process VARIANT_CALLING_STATS {
 
 	shell:
 	'''
-	bcftools stats -f PASS --threads !{num_threads} !{vcf_file} > !{sample_id}_vcfstats.txt
-	### maybe PASS_ADJ ? 
+	bcftools stats -f ADJ_PASS --threads !{num_threads} !{vcf_file} > !{sample_id}_vcfstats.txt
 	### bcftools merge !!!
+	'''
+}
+
+
+process MERGE_VCF { 
+	container "dnavc-pipeline:latest"
+	tag "$sample_id"
+	publishDir "$params.data_dir/variants_vcf/_all", mode: "copy", overwrite: false
+
+	input:
+		path(vcf_files)
+		val num_threads
+
+	output:
+		path "all_vcf_merged.vcf", emit: vcf_all
+
+	shell:
+	'''
+	bcftools merge -o all_vcf_merged.vcf --threads !{num_threads} !{vcf_files}
 	'''
 }
 
@@ -270,7 +288,7 @@ process VARIANT_ANNOTATION {
 	publishDir "$params.data_dir/variants_vcf/_all", mode: "copy", overwrite: false
 
 	input:
-		path pvcf_glnexus
+		path vcf_all
 		val num_threads
 
 	output:
@@ -278,7 +296,7 @@ process VARIANT_ANNOTATION {
 
 	shell:
 	'''
-	oc run -l hg38 -t csv -x --mp !{num_threads} !{pvcf_glnexus}
+	oc run -l hg38 -t csv -x --mp !{num_threads} !{vcf_all}
 	'''
 }
 
