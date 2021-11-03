@@ -38,7 +38,7 @@ process SOMVC_LOFREQ {
 	cache false
 
 	input:
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
 		val num_threads
@@ -79,7 +79,7 @@ process SOMVC_MUTECT2 {
 	cache false
 
 	input:
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
 		val num_threads
@@ -90,7 +90,9 @@ process SOMVC_MUTECT2 {
 
 	shell:
 	'''
-	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} --normal-sample germline -I !{tumor_file} --tumor-sample tumor --native-pair-hmm-threads !{num_threads} --intervals !{bed_file[0]} -O mutect2_unfiltered.vcf
+	gunzip -c !{bed_file[0]} > bed_file_unzipped.bed   # mutect2 need unzipped
+	
+	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome[0]} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	bgzip -c mutect2_filtered.vcf > mutect2_filtered.vcf.gz
@@ -107,14 +109,14 @@ process SOMVC_STRELKA {
 	cache false
 
 	input:
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
 		val num_threads
 
 	output:
 		path "*"
-		tuple path ("somatic.snvs.vcf.gz"), path("somatic.snvs.vcf.gz.tbi"), emit: strelka_snv_vcf
+		tuple path ("strelka_dir/results/variants/somatic.snvs.vcf.gz"), path("strelka_dir/results/variants/somatic.snvs.vcf.gz.tbi"), emit: strelka_snv_vcf
 		tuple path ("somatic.indels_vt.vcf.gz"), path("somatic.indels_vt.vcf.gz.tbi"), emit: strelka_indel_vcf
 
 	shell:
@@ -126,7 +128,7 @@ process SOMVC_STRELKA {
 	strelka_dir/runWorkflow.py -m local -j !{num_threads}
 
 	### vt normalization for indels
-	vt normalize somatic.indels.vcf.gz -r !{reference_genome[0]} -o somatic.indels_vt.vcf.gz
+	vt normalize strelka_dir/results/variants/somatic.indels.vcf.gz -r !{reference_genome[0]} -o somatic.indels_vt.vcf.gz
 	tabix -p vcf somatic.indels_vt.vcf.gz
 	'''
 }
@@ -138,7 +140,7 @@ process SOMVC_VARDICT {
 	cache false
 
 	input:
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
 		val num_threads
@@ -219,7 +221,7 @@ process CONPAIR_CONTAMINATION {
 	cache false
 
 	input:
-		tuple val(sample_id), path(normal_file), path(tumor_file) 
+		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 
 	output:

@@ -72,7 +72,7 @@ workflow {
 	channel_sample_match = Channel
 			.fromPath(params.sample_match_file)
 			.splitCsv(header:true)
-			.map{ row -> tuple(row.sample_id, row.normal_file, row.tumor_file ) }
+			.map{ row -> tuple(row.sample_id, row.normal_file, row.tumor_file, row.normal_file+".bai", row.tumor_file+".bai" ) }
 			//.map{ row -> tuple(row.sample_id, tuple(row.normal_file, row.tumor_file)) }
 			.ifEmpty { error "cannot read in sample_match_file correctly: ${params.sample_match_file}" }
 			.take( params.dev_samples )  // only consider a few files for debugging
@@ -81,8 +81,8 @@ workflow {
 
 	INDEX_REFERENCE(params.reference_genome, params.bed_file)
 
-	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
-	//SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	//SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	//SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	//SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
