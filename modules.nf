@@ -14,7 +14,7 @@ process INDEX_REFERENCE {
 
 	output:
 		tuple path("*.fa"), path("*.fa.fai"), path("*.dict"), emit: reference_genome
-		tuple path("*.bed.gz"), path("*.bed.gz.tbi"), emit: bed_file
+		tuple path("*.bed_sorted.gz"), path("*.bed_sorted.gz.tbi"), emit: bed_file
 
 	shell:
 	'''
@@ -52,6 +52,9 @@ process SOMVC_LOFREQ {
 	'''
 	### https://csb5.github.io/lofreq/commands/#somatic
 
+	gunzip -c !{bed_file[0]} > bed_file_unzipped.bed   # vardict need unzipped
+	
+
 	lofreq viterbi -f !{reference_genome[0]} !{normal_file} | samtools sort -@ !{num_threads} -o normal_file_viterbi.bam -
 	lofreq indelqual --dindel -f !{reference_genome[0]} -o normal_file_indelqual.bam normal_file_viterbi.bam
 	samtools index -b -@ !{num_threads} normal_file_viterbi.bam
@@ -60,7 +63,7 @@ process SOMVC_LOFREQ {
 	lofreq indelqual --dindel -f !{reference_genome[0]} -o tumor_file_indelqual.bam tumor_file_viterbi.bam
 	samtools index -b -@ !{num_threads} tumor_file_viterbi.bam
 
-	lofreq somatic -n normal_file_viterbi.bam -t tumor_file_viterbi.bam -f !{reference_genome[0]} --threads !{num_threads} -o lofreq_ -l !{bed_file[0]} --call-indels
+	lofreq somatic -n normal_file_viterbi.bam -t tumor_file_viterbi.bam -f !{reference_genome[0]} --threads !{num_threads} -o lofreq_ -l bed_file_unzipped.bed --call-indels
 	
 	### vt normalization for indels
 	vt normalize lofreq_somatic_final.indels.vcf.gz -r !{reference_genome[0]} -o lofreq_somatic_final.indels_vt.vcf.gz
@@ -185,6 +188,7 @@ process SOMATIC_COMBINER {
 	cache false
 
 	input:
+		val sample_id
 		path lofreq_indel_vcf
 		path lofreq_snv_vcf
 		path mutect2_vcf
@@ -194,14 +198,15 @@ process SOMATIC_COMBINER {
 
 	output:
 		path "somatic_combiner_vcf.vcf", emit: somatic_combiner_vcf
+		tuple val($sample_id), path ("somatic_combiner_vcf.vcf"), emit: somatic_combiner_vcf
 
 
 	shell:
 	'''
 	java -jar /usr/src/somaticCombiner.jar -L ${lofreq_indel_vcf} -l ${lofreq_snv_vcf} -M ${mutect2_vcf} -s ${strelka_snv} -S ${strelka_indel_vcf} -D ${vardict_vcf} -o somatic_combiner_vcf.vcf
 
+	#bcftools reheader https://samtools.github.io/bcftools/bcftools.html
 	
-
 	'''
 }
 

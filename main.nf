@@ -79,9 +79,9 @@ workflow {
 	channel_sample_match.view()
 
 
-	INDEX_REFERENCE(params.reference_genome)
+	INDEX_REFERENCE(params.reference_genome, params.bed_file)
 
-	//SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	//SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	//SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	//SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
@@ -89,7 +89,7 @@ workflow {
 
 // somatic combiner include sample_id
 
-	//SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snv_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_vcf)
+	//SOMATIC_COMBINER(channel_sample_match[1], SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snv_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_vcf)
 	//CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome);
 	//VARIANT_CALLING_STATS(sample_ID, SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads);  // TODO
 	//MERGE_VCF(SOMATIC_COMBINER.out.somatic_combiner_vcf.collect(), params.num_threads) 
