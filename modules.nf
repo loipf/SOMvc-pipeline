@@ -49,6 +49,7 @@ process SOMVC_LOFREQ {
 		path "*"
 		tuple path ("lofreq_somatic_final.snvs.vcf.gz"), path("lofreq_somatic_final.snvs.vcf.gz.tbi"), emit: lofreq_snvs_vcf
 		tuple path ("lofreq_somatic_final.indels_vt.vcf.gz"), path("lofreq_somatic_final.indels_vt.vcf.gz.tbi"), emit: lofreq_indel_vcf
+		val $sample_id, emit: lofreq_sample_id
 
 	shell:
 	'''
@@ -201,15 +202,16 @@ process SOMATIC_COMBINER {
 		path vardict_vcf
 
 	output:
-		path "somatic_combiner_vcf.vcf", emit: somatic_combiner_vcf
-		tuple val($sample_id), path ("somatic_combiner_vcf.vcf"), emit: somatic_combiner_vcf
+		//path "somatic_combiner_vcf_renamed.vcf", emit: somatic_combiner_vcf
+		tuple val($sample_id), path ("somatic_combiner_vcf_renamed.vcf"), emit: somatic_combiner_vcf
 
 
 	shell:
 	'''
-	java -jar /usr/src/somaticCombiner.jar -L ${lofreq_indel_vcf} -l ${lofreq_snv_vcf} -M ${mutect2_vcf} -s ${strelka_snv} -S ${strelka_indel_vcf} -D ${vardict_vcf} -o somatic_combiner_vcf.vcf
+	java -jar /usr/src/somaticCombiner.jar -L !{lofreq_indel_vcf} -l !{lofreq_snv_vcf} -M !{mutect2_vcf} -s ${strelka_snv} -S !{strelka_indel_vcf} -D !{vardict_vcf} -o somatic_combiner_vcf.vcf
 
-	#bcftools reheader https://samtools.github.io/bcftools/bcftools.html
+	printf '%s\n' !{sample_id}_tumor !{sample_id}_normal > sample_names.txt 
+	bcftools reheader --samples sample_names.txt -o somatic_combiner_vcf_renamed.vcf
 	
 	'''
 }

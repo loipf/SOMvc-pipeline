@@ -18,9 +18,11 @@ RUN conda install \
 		strelka==2.9.10 \
 		samtools==1.12.0 \
 		bedtools==2.30.0 \
-		vt==2015.11.10
+		vt==2015.11.10 
+#RUN conda install r-base==3.6.3 r-essentials
+#RUN conda install -y r-base r-essentials
 RUN conda install -y numpy==1.16.5 scipy==1.2.1
-RUN conda install r-base==3.2.2 r-essentials readline=6.2
+RUN conda install r-base r-essentials
 
 
 ### download VarDictJava - faster than perl conda version
