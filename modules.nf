@@ -159,29 +159,9 @@ process SOMVC_VARDICT {
 
 	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome[0]} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} bed_file_unzipped.bed | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
-	# https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
-	gatk VariantFiltration -R !{reference_genome[0]} -V vardict_output.vcf -O vardict_output_filtered.vcf --filterName "bcbio_advised" \
+	### https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
+	gatk VariantFiltration -R !{reference_genome[0]} -V vardict_output.vcf -O vardict_output_filtered.vcf --filter-name bcbio_advised \
 			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
-
-	
-### TODO DELETE
-### weird C writing error introducing empty bytes - deleted with tr - ONLY WITH JAVA version
-#	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome[0]} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
-
-# /usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome[0]} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -th !{num_threads} -z 1 -c 1 -S 2 -E 3 -g 4 !{bed_file[0]} | tr -d '\000' | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
-
-#VarDict-1.8.2/bin/VarDict -G Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz -b "/home/stefanloipfinger/Documents/somvc_pipeline_test/baseline_reads_mapped/IMPACT_MBC1_001_BKDN190631707-1A_HTKWGDSXX_L2/IMPACT_MBC1_001_BKDN190631707-1A_HTKWGDSXX_L2.bam|/home/stefanloipfinger/Documents/somvc_pipeline_test/tumor_reads_mapped/IMPACT_MBC1_002_BKDN190631708-1A_HTKWGDSXX_L4/IMPACT_MBC1_002_BKDN190631708-1A_HTKWGDSXX_L4.bam" -Q 5 -th 1 -R Homo_sapiens_short.GRCh38.cds.all.bed -z 1 -c 1 -S 2 -E 3 -g 4| tr -d '\000' | VarDict-1.8.2/bin/testsomatic.R | VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -f 0.8 -M -N "tumur_sample|normal_sample" > vardict_output.vcf
-
-# -R chr7:50000-200000
-
-#VarDict-1.8.2/bin/VarDict -G Homo_sapiens.GRCh38.dna.primary_assembly.fa -k 1 -b "/home/stefanloipfinger/Documents/somvc_pipeline_test/tumor_reads_mapped/IMPACT_MBC1_002_BKDN190631708-1A_HTKWGDSXX_L4/IMPACT_MBC1_002_chr17.bam|/home/stefanloipfinger/Documents/somvc_pipeline_test/baseline_reads_mapped/IMPACT_MBC1_001_BKDN190631707-1A_HTKWGDSXX_L2/IMPACT_MBC1_001_chr17.bam" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th 10 -R chr17:7500005-7599990 > vardict_output_all.vcf
-
-
-# check
-#AF THR="0.01"
-#vardict -C -G Ref GRCh37.67.fasta -f $AF THR -N sampleX -b sampleX.bam -h -c 1 -S 2
-#-E 3 -g 4 target.bed > sampleX.txt
-
 
 	'''
 }
@@ -203,15 +183,15 @@ process SOMATIC_COMBINER {
 
 	output:
 		//path "somatic_combiner_vcf_renamed.vcf", emit: somatic_combiner_vcf
-		tuple val($sample_id), path ("somatic_combiner_vcf_renamed.vcf"), emit: somatic_combiner_vcf
+		tuple val($sample_id), path ("somatic_combiner_sample.vcf"), emit: somatic_combiner_vcf
 
 
 	shell:
 	'''
-	java -jar /usr/src/somaticCombiner.jar -L !{lofreq_indel_vcf} -l !{lofreq_snv_vcf} -M !{mutect2_vcf} -s ${strelka_snv} -S !{strelka_indel_vcf} -D !{vardict_vcf} -o somatic_combiner_vcf.vcf
+	java -jar /usr/src/somaticCombiner.jar -L !{lofreq_indel_vcf} -l !{lofreq_snv_vcf} -M !{mutect2_vcf} -s ${strelka_snv} -S !{strelka_indel_vcf} -D !{vardict_vcf} -o somatic_combiner_raw.vcf
 
 	printf '%s\n' !{sample_id}_tumor !{sample_id}_normal > sample_names.txt 
-	bcftools reheader --samples sample_names.txt -o somatic_combiner_vcf_renamed.vcf
+	bcftools reheader --samples sample_names.txt -o somatic_combiner_sample.vcf somatic_combiner_raw.vcf
 	
 	'''
 }
@@ -244,9 +224,9 @@ process CONPAIR_CONTAMINATION {
 	run_gatk_pileup_for_sample.py -B !{tumor_file} -O tumor_pileup --reference !{reference_genome[0]} --conpair_dir /usr/src/conpair/ --markers markers_GRCh38_snv_formatted.bed
 	run_gatk_pileup_for_sample.py -B !{normal_file} -O normal_pileup --reference !{reference_genome[0]} --conpair_dir /usr/src/conpair/ --markers markers_GRCh38_snv_formatted.bed
 
-	verify_concordance.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile concordance_stats.txt
+	verify_concordance.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile !{sample_id}_concordance_stats.txt
 
-	estimate_tumor_normal_contamination.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile contamination_stats.txt
+	estimate_tumor_normal_contamination.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile !{sample_id}_contamination_stats.txt
 
 	'''
 }
@@ -307,6 +287,8 @@ process VARIANT_ANNOTATION {
 
 	shell:
 	'''
+	oc module ls -t annotator > oc_databases_version.txt  ### output OpenCRAVAT database versions
+	
 	oc run -l hg38 -t csv -x --mp !{num_threads} !{vcf_all}
 	'''
 }

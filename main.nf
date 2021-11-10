@@ -53,7 +53,7 @@ params.bed_file	= "$params.project_dir/data/Homo_sapiens.GRCh38.cds.all.bed"
 log.info """\
 SOMATIC-VC PIPELINE
 ===================================================
-sample_match_file		: $params.sample_match_file
+sample_match_file	: $params.sample_match_file
 data_dir		: $params.data_dir
 reference_genome	: $params.reference_genome
 bed_file		: $params.bed_file
@@ -76,7 +76,7 @@ workflow {
 			//.map{ row -> tuple(row.sample_id, tuple(row.normal_file, row.tumor_file)) }
 			.ifEmpty { error "cannot read in sample_match_file correctly: ${params.sample_match_file}" }
 			.take( params.dev_samples )  // only consider a few files for debugging
-	channel_sample_match.view()
+	//channel_sample_match.view()
 
 
 	INDEX_REFERENCE(params.reference_genome, params.bed_file)
@@ -87,22 +87,17 @@ workflow {
 	SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
 
-// somatic combiner include sample_id
 
 	//SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_sample_id, SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snv_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_vcf)
 	//CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome);
-	//VARIANT_CALLING_STATS(sample_ID, SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads);  // TODO
-	//MERGE_VCF(SOMATIC_COMBINER.out.somatic_combiner_vcf.collect(), params.num_threads) 
+	//VARIANT_CALLING_STATS(SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads); 
+	//MERGE_VCF(SOMATIC_COMBINER.out.somatic_combiner_vcf.collect{it[2]}, params.num_threads) 
 	//VARIANT_ANNOTATION(MERGE_VCF.out.vcf_all, params.num_threads);
 	//MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect(), CONPAIR_CONTAMINATION.out.conpair_info.collect())
 
 
 
 
-	//VARIANT_CALLING(channel_reads_mapped, params.num_threads, INDEX_REFERENCE.out.reference_genome)
-	//VARIANT_CALLING_STATS(VARIANT_CALLING.out.vcf, params.num_threads)
-	//VARIANT_MERGING(VARIANT_CALLING.out.global_vcf.collect(), params.num_threads)
-	//GLNEXUS_BCF_TO_VCF(VARIANT_MERGING.out.glnexus_bcf, params.num_threads)
 
 }
 
