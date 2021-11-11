@@ -150,7 +150,7 @@ process SOMVC_VARDICT {
 
 	output:
 		path "*"
-		path "*", emit: vardict_snv_vcf
+		path "vardict_output_filtered.vcf", emit: vardict_snv_vcf
 
 
 	shell: 
@@ -160,11 +160,36 @@ process SOMVC_VARDICT {
 	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome[0]} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} bed_file_unzipped.bed | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
 
 	### https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
-	gatk VariantFiltration -R !{reference_genome[0]} -V vardict_output.vcf -O vardict_output_filtered.vcf --filter-name bcbio_advised \
-			--filterExpression "((AF*DP < 6) && ((MQ < 55.0 && NM > 1.0) || (MQ < 60.0 && NM > 2.0) || (DP < 10) || (QUAL < 45)))" 
+	gatk VariantFiltration -R !{reference_genome[0]} -V vardict_output.vcf -O vardict_output_filtered.vcf --filter-name bcbio_advised --filter-expression "((AF*DP<6)&&((MQ<55.0&&NM>1.0)||(MQ<60.0&&NM>2.0)||(DP<10)||(QUAL<45)))" 
 
 	'''
 }
+
+
+process SOMVC_VARDICT_TEST { 
+	publishDir "$params.data_dir/vc_caller/vardict", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
+	cache false
+
+	input:
+		path vcf_file
+		path reference_genome
+		val variant_filter_expression
+
+	output:
+		path "*"
+		path "*", emit: vardict_snv_vcf
+
+	shell:
+	'''
+	#gatk VariantFiltration -R '!{reference_genome[0]}' -V '!{vcf_file}' -O vardict_output_filtered.vcf --filter-name 'bcbio_advised' --filter-expression "!{variant_filter_expression}"
+	
+	gatk VariantFiltration -R '!{reference_genome[0]}' -V '!{vcf_file}' -O vardict_output_filtered.vcf --filter-name 'bcbio_advised' --filter-expression "((AF*DP<6)&&((MQ<55.0&&NM>1.0)||(MQ<60.0&&NM>2.0)||(DP<10)||(QUAL<45)))"
+	
+	
+	'''
+
+}
+
 
 
 process SOMATIC_COMBINER { 
@@ -214,10 +239,10 @@ process CONPAIR_CONTAMINATION {
 	shell:
 	'''
 
-	MARKER_FILE_BED="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.bed"
+	MARKER_FILE_BED="/usr/src/conpair/conpair/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.bed"
 	sed -e 's/chr//g' $MARKER_FILE_BED > markers_GRCh38_snv_formatted.bed  ### rename chromosomes
 
-	MARKER_FILE_TXT="/usr/src/conpair/data/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
+	MARKER_FILE_TXT="/usr/src/conpair/conpair/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
 	sed -e 's/chr//g' $MARKER_FILE_TXT > markers_GRCh38_snv_formatted.txt  ### rename chromosomes
 
 
@@ -248,7 +273,6 @@ process VARIANT_CALLING_STATS {
 	shell:
 	'''
 	bcftools stats -f ADJ_PASS --threads !{num_threads} !{vcf_file} > !{sample_id}_vcfstats.txt
-	### bcftools merge !!!
 	'''
 }
 
