@@ -23,7 +23,6 @@ include {
 	MERGE_VCF;
 	MULTIQC_VCF;
 	VARIANT_ANNOTATION;
-	SOMVC_VARDICT_TEST;
 } from './modules.nf' 
 
 
@@ -90,12 +89,10 @@ workflow {
 	SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
-	//SOMVC_VARDICT_TEST(params.vcf_test,INDEX_REFERENCE.out.reference_genome, params.variant_filter_expression)
-
-
 	SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_sample_id, SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snvs_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_snv_vcf)
-	//CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome);
 	VARIANT_CALLING_STATS(SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads); 
+	
+	//CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome);
 	MERGE_VCF(SOMATIC_COMBINER.out.somatic_combiner_vcf.collect{it[2]}, params.num_threads) 
 	//VARIANT_ANNOTATION(MERGE_VCF.out.vcf_all, params.num_threads);
 	//MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect(), CONPAIR_CONTAMINATION.out.conpair_info.collect())

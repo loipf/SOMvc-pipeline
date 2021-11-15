@@ -18,11 +18,20 @@ RUN conda install \
 		strelka==2.9.10 \
 		samtools==1.12.0 \
 		bedtools==2.30.0 \
-		vt==2015.11.10 
-#RUN conda install r-base==3.6.3 r-essentials
+		vt==2015.11.10
 RUN conda install -y numpy==1.16.5 scipy==1.2.1
 RUN apt install -y r-base 
 
+### download bcftools and set up - with conda package it leads to conflicts
+RUN wget https://github.com/samtools/bcftools/releases/download/1.14/bcftools-1.14.tar.bz2
+RUN tar -xjf bcftools-1.14.tar.bz2 -C /usr/src/
+RUN rm bcftools-1.14.tar.bz2
+WORKDIR "/usr/src/bcftools-1.14/"
+RUN ./configure --prefix /usr/src/bcftools/
+RUN make
+RUN make install
+ENV PATH="/usr/src/bcftools/bin:${PATH}"
+WORKDIR "/"
 
 ### download VarDictJava - faster than perl conda version
 RUN wget https://github.com/AstraZeneca-NGS/VarDictJava/releases/download/v1.8.2/VarDict-1.8.2.tar

@@ -37,7 +37,6 @@ process INDEX_REFERENCE {
 process SOMVC_LOFREQ { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/vc_caller/lofreq", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
 
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
@@ -49,7 +48,7 @@ process SOMVC_LOFREQ {
 		path "*"
 		tuple path ("lofreq_somatic_final.snvs.vcf.gz"), path("lofreq_somatic_final.snvs.vcf.gz.tbi"), emit: lofreq_snvs_vcf
 		tuple path ("lofreq_somatic_final.indels_vt.vcf.gz"), path("lofreq_somatic_final.indels_vt.vcf.gz.tbi"), emit: lofreq_indel_vcf
-		val $sample_id, emit: lofreq_sample_id
+		val "$sample_id", emit: lofreq_sample_id
 
 	shell:
 	'''
@@ -79,7 +78,6 @@ process SOMVC_LOFREQ {
 process SOMVC_MUTECT2 { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/vc_caller/mutect2", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
 
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
@@ -98,7 +96,11 @@ process SOMVC_MUTECT2 {
 	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome[0]} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
-	bgzip -c mutect2_filtered.vcf > mutect2_filtered.vcf.gz
+	### rename for somatic-combiner
+	printf '%s\n' NORMAL TUMOR > sample_names.txt 
+	bcftools reheader --samples sample_names.txt -o mutect2_filtered_name.vcf mutect2_filtered.vcf
+
+	bgzip -c mutect2_filtered_name.vcf > mutect2_filtered.vcf.gz
 	vt normalize mutect2_filtered.vcf.gz -r !{reference_genome[0]} -o mutect2_filtered_vt.vcf.gz
 	tabix -p vcf mutect2_filtered_vt.vcf.gz
 	'''
@@ -109,7 +111,6 @@ process SOMVC_MUTECT2 {
 process SOMVC_STRELKA { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/vc_caller/strelka", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
 
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
@@ -140,7 +141,6 @@ process SOMVC_STRELKA {
 process SOMVC_VARDICT { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/vc_caller/vardict", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
 
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
@@ -166,36 +166,10 @@ process SOMVC_VARDICT {
 }
 
 
-process SOMVC_VARDICT_TEST { 
-	publishDir "$params.data_dir/vc_caller/vardict", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
-
-	input:
-		path vcf_file
-		path reference_genome
-		val variant_filter_expression
-
-	output:
-		path "*"
-		path "*", emit: vardict_snv_vcf
-
-	shell:
-	'''
-	#gatk VariantFiltration -R '!{reference_genome[0]}' -V '!{vcf_file}' -O vardict_output_filtered.vcf --filter-name 'bcbio_advised' --filter-expression "!{variant_filter_expression}"
-	
-	gatk VariantFiltration -R '!{reference_genome[0]}' -V '!{vcf_file}' -O vardict_output_filtered.vcf --filter-name 'bcbio_advised' --filter-expression "((AF*DP<6)&&((MQ<55.0&&NM>1.0)||(MQ<60.0&&NM>2.0)||(DP<10)||(QUAL<45)))"
-	
-	
-	'''
-
-}
-
-
 
 process SOMATIC_COMBINER { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/vc_caller/somatic_combiner", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
 
 	input:
 		val sample_id
@@ -207,13 +181,12 @@ process SOMATIC_COMBINER {
 		path vardict_vcf
 
 	output:
-		//path "somatic_combiner_vcf_renamed.vcf", emit: somatic_combiner_vcf
-		tuple val($sample_id), path ("somatic_combiner_sample.vcf"), emit: somatic_combiner_vcf
+		tuple val("${sample_id}"), path ("somatic_combiner_sample.vcf"), emit: somatic_combiner_vcf
 
 
 	shell:
 	'''
-	java -jar /usr/src/somaticCombiner.jar -L !{lofreq_indel_vcf} -l !{lofreq_snv_vcf} -M !{mutect2_vcf} -s ${strelka_snv} -S !{strelka_indel_vcf} -D !{vardict_vcf} -o somatic_combiner_raw.vcf
+	java -jar /usr/src/somaticCombiner.jar -L !{lofreq_indel_vcf} -l !{lofreq_snv_vcf} -M !{mutect2_vcf} -s !{strelka_snv_vcf} -S !{strelka_indel_vcf} -D !{vardict_vcf} -o somatic_combiner_raw.vcf
 
 	printf '%s\n' !{sample_id}_tumor !{sample_id}_normal > sample_names.txt 
 	bcftools reheader --samples sample_names.txt -o somatic_combiner_sample.vcf somatic_combiner_raw.vcf
@@ -227,7 +200,6 @@ process SOMATIC_COMBINER {
 process CONPAIR_CONTAMINATION { 
 	tag "$sample_id"
 	publishDir "$params.data_dir/conpair", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
-	cache false
 
 	input:
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
