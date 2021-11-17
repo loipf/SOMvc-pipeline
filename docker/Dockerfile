@@ -2,7 +2,7 @@ FROM conda/miniconda2@sha256:d30ea858b9d3425127c2e835d39653cdca74368af832d65748c
 
 MAINTAINER loipf
 
-RUN apt-get update && apt install -y wget unzip gzip
+RUN apt-get update && apt install -y wget unzip gzip procps
 
 RUN conda config --add channels defaults
 RUN conda config --add channels bioconda
@@ -53,12 +53,6 @@ RUN pip install /usr/src/conpair
 
 
 
-### download mutect2 helper files - even though they are pretty outdated its better than nothing
-#RUN mkdir /usr/src/mutect2_genome
-#RUN wget https://storage.googleapis.com/gatk-best-practices/somatic-hg38/1000g_pon.hg38.vcf.gz -O /usr/src/mutect2_genome/1000g_pon.hg38.vcf.gz
-#RUN wget https://storage.googleapis.com/gatk-best-practices/somatic-hg38/1000g_pon.hg38.vcf.gz.tbi -O /usr/src/mutect2_genome/1000g_pon.hg38.vcf.gz.tbi
-#RUN wget https://storage.googleapis.com/gatk-best-practices/somatic-hg38/af-only-gnomad.hg38.vcf.gz -O /usr/src/mutect2_genome/af-only-gnomad.hg38.vcf.gz
-#RUN wget https://storage.googleapis.com/gatk-best-practices/somatic-hg38/af-only-gnomad.hg38.vcf.gz.tbi -O /usr/src/mutect2_genome/af-only-gnomad.hg38.vcf.gz.tbi
 
 
 
