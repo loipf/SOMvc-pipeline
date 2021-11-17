@@ -32,6 +32,22 @@ rm common_both.txt
 
 
 
+### get dbsnp for base recalibration
+curl https://ftp.ncbi.nih.gov/snp/archive/b$dbsnp_release/VCF/GCF_000001405.38.gz > dbsnp_154_hg38.vcf.gz
+gunzip -c dbsnp_154_hg38.vcf.gz | grep "^#\|COMMON" | bgzip -c > dbsnp_154_hg38_COMMON.vcf.gz
+tabix dbsnp_154_hg38_COMMON.vcf.gz
+
+### rename chromosomes: help from https://www.biostars.org/p/410789/
+wget -N ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_assembly_report.txt
+out_chrnames=$(echo GCF_000001405.39_GRCh38.p13_assembly_report.txt | sed 's/.txt/.chrnames/')
+grep -e '^[^#]' $k | awk '{ print $7, $1 }' > $out_chrnames
+
+bcftools annotate --rename-chrs GCF_000001405.39_GRCh38.p13_assembly_report.chrnames --threads 10 -Oz -o dbsnp_154_hg38_renamed_COMMON.vcf.gz dbsnp_154_hg38_COMMON.vcf.gz
+
+rm GCF_000001405.39_GRCh38.p13_assembly_report.txt
+rm dbsnp_154_hg38.vcf.gz
+rm dbsnp_154_hg38_COMMON.vcf.gz
+
 
 
 ### short test genome

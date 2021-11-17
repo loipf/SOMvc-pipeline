@@ -13,10 +13,12 @@ process INDEX_REFERENCE {
 	input:
 		path reference_genome
 		path bed_file
+		path dbsnp_file
 
 	output:
 		tuple path("*.fa"), path("*.fa.fai"), path("*.dict"), emit: reference_genome
 		tuple path("*.bed_sorted.gz"), path("*.bed_sorted.gz.tbi"), emit: bed_file
+		tuple path("$dbsnp_file"), path("*.vcf.gz.tbi"), emit: dbsnp_file
 
 	shell:
 	'''
@@ -29,6 +31,8 @@ process INDEX_REFERENCE {
 
 	bedtools sort -i !{bed_file} | bgzip -c > !{bed_file}_sorted.gz
 	tabix --zero-based -b 2 -e 3 !{bed_file}_sorted.gz
+	
+	tabix !{dbsnp_file}
 	'''
 }
 
@@ -42,6 +46,7 @@ process SOMVC_LOFREQ {
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
+		path dbsnp_file
 		val num_threads
 
 	output:
@@ -53,9 +58,7 @@ process SOMVC_LOFREQ {
 	shell:
 	'''
 	### https://csb5.github.io/lofreq/commands/#somatic
-
 	gunzip -c !{bed_file[0]} > bed_file_unzipped.bed   # vardict need unzipped
-	
 
 	lofreq viterbi -f !{reference_genome[0]} !{normal_file} | samtools sort -@ !{num_threads} -o normal_file_viterbi.bam -
 	lofreq indelqual --dindel -f !{reference_genome[0]} -o normal_file_indelqual.bam normal_file_viterbi.bam
@@ -65,7 +68,7 @@ process SOMVC_LOFREQ {
 	lofreq indelqual --dindel -f !{reference_genome[0]} -o tumor_file_indelqual.bam tumor_file_viterbi.bam
 	samtools index -b -@ !{num_threads} tumor_file_viterbi.bam
 
-	lofreq somatic -n normal_file_viterbi.bam -t tumor_file_viterbi.bam -f !{reference_genome[0]} --threads !{num_threads} -o lofreq_ -l bed_file_unzipped.bed --call-indels
+	lofreq somatic -n normal_file_viterbi.bam -t tumor_file_viterbi.bam -f !{reference_genome[0]} --threads !{num_threads} -o lofreq_ -l bed_file_unzipped.bed --call-indels -d !{dbsnp_file[0]}
 	
 	### vt normalization for indels
 	vt normalize lofreq_somatic_final.indels.vcf.gz -r !{reference_genome[0]} -o lofreq_somatic_final.indels_vt.vcf.gz
@@ -83,6 +86,7 @@ process SOMVC_MUTECT2 {
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
+		path dbsnp_file
 		val num_threads
 
 	output:
@@ -93,7 +97,14 @@ process SOMVC_MUTECT2 {
 	'''
 	gunzip -c !{bed_file[0]} > bed_file_unzipped.bed   # mutect2 need unzipped
 	
-	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -I !{tumor_file} --native-pair-hmm-threads !{num_threads} --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
+	gatk GetSampleName -I !{normal_file} -O sample_normal.txt
+	normal_sample_name=$(cat sample_normal.txt)
+	gatk GetSampleName -I !{tumor_file} -O sample_tumor.txt
+	tumor_sample_name=$(cat sample_tumor.txt)
+	
+	#gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -normal $normal_sample_name -I !{tumor_file} -tumor $tumor_sample_name --native-pair-hmm-threads !{num_threads} --germline-resource /usr/src/mutect2_genome/af-only-gnomad.hg38.vcf.gz --panel-of-normals /usr/src/mutect2_genome/1000g_pon.hg38.vcf.gz --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
+	
+	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -normal $normal_sample_name -I !{tumor_file} -tumor $tumor_sample_name --native-pair-hmm-threads !{num_threads} --germline-resource !{dbsnp_file[0]} --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome[0]} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	### rename for somatic-combiner
@@ -181,7 +192,7 @@ process SOMATIC_COMBINER {
 		path vardict_vcf
 
 	output:
-		tuple val("${sample_id}"), path ("somatic_combiner_sample.vcf"), emit: somatic_combiner_vcf
+		tuple val("${sample_id}"), path ("*_somatic_combiner_all.vcf.gz"), path ("*_somatic_combiner_all.vcf.gz.tbi"), emit: somatic_combiner_vcf
 
 
 	shell:
@@ -191,6 +202,8 @@ process SOMATIC_COMBINER {
 	printf '%s\n' !{sample_id}_tumor !{sample_id}_normal > sample_names.txt 
 	bcftools reheader --samples sample_names.txt -o somatic_combiner_sample.vcf somatic_combiner_raw.vcf
 	
+	bgzip -c somatic_combiner_sample.vcf > !{sample_id}_somatic_combiner_all.vcf.gz
+	tabix -p vcf !{sample_id}_somatic_combiner_all.vcf.gz
 	'''
 }
 
@@ -206,11 +219,10 @@ process CONPAIR_CONTAMINATION {
 		path reference_genome
 
 	output:
-		path "*", emit: conpair_info
+		path "*_stats.txt", emit: conpair_info
 
 	shell:
 	'''
-
 	MARKER_FILE_BED="/usr/src/conpair/conpair/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.bed"
 	sed -e 's/chr//g' $MARKER_FILE_BED > markers_GRCh38_snv_formatted.bed  ### rename chromosomes
 
@@ -224,7 +236,6 @@ process CONPAIR_CONTAMINATION {
 	verify_concordance.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile !{sample_id}_concordance_stats.txt
 
 	estimate_tumor_normal_contamination.py -T tumor_pileup -N normal_pileup --markers markers_GRCh38_snv_formatted.txt --outfile !{sample_id}_contamination_stats.txt
-
 	'''
 }
 
@@ -236,7 +247,7 @@ process VARIANT_CALLING_STATS {
 	publishDir "$params.data_dir/variants_vcf", mode: "copy", overwrite: false, saveAs: { filename -> "${sample_id}/$filename" }
 
 	input:
-		tuple val(sample_id), path(vcf_file)
+		tuple val(sample_id), path(vcf_file), path(vcf_file_index)
 		val num_threads
 
 	output:
@@ -251,19 +262,19 @@ process VARIANT_CALLING_STATS {
 
 process MERGE_VCF { 
 	container "dnavc-pipeline:latest"
-	tag "$sample_id"
 	publishDir "$params.data_dir/variants_vcf/_all", mode: "copy", overwrite: false
 
 	input:
-		path(vcf_files)
+		path vcf_files
 		val num_threads
 
 	output:
-		path "all_vcf_merged.vcf", emit: vcf_all
+		path "all_samples_vcf_merged.vcf.gz", emit: vcf_all
 
 	shell:
 	'''
-	bcftools merge -o all_vcf_merged.vcf --threads !{num_threads} !{vcf_files}
+	bcftools merge -Oz -o all_samples_vcf_merged.vcf.gz --threads !{num_threads} *_somatic_combiner_all.vcf.gz
+	
 	'''
 }
 

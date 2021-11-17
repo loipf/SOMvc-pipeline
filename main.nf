@@ -47,9 +47,10 @@ params.scripts_dir	= "$params.project_dir/scripts"
 params.num_threads		= 3
 params.reference_genome	= "$params.project_dir/data/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
 params.bed_file	= "$params.project_dir/data/Homo_sapiens.GRCh38.cds.all.bed"
+params.dbsnp_file	= "$params.project_dir/data/dbsnp_154_hg38_renamed_COMMON.vcf.gz"
+
 
 params.vcf_test = "/home/stefanloipfinger/Desktop/vardict_output.vcf"
-params.variant_filter_expression = "MQ<55.0"
 
 
 
@@ -60,6 +61,7 @@ sample_match_file	: $params.sample_match_file
 data_dir		: $params.data_dir
 reference_genome	: $params.reference_genome
 bed_file		: $params.bed_file
+dbsnp_file		: $params.dbsnp_file
 
 ===================================================
 
@@ -82,20 +84,21 @@ workflow {
 	//channel_sample_match.view()
 
 
-	INDEX_REFERENCE(params.reference_genome, params.bed_file)
+	INDEX_REFERENCE(params.reference_genome, params.bed_file, params.dbsnp_file)
 
-	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
-	SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file,INDEX_REFERENCE.out.dbsnp_file, params.num_threads)
+	SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file,INDEX_REFERENCE.out.dbsnp_file, params.num_threads)
 	SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
 	SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_sample_id, SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snvs_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_snv_vcf)
-	VARIANT_CALLING_STATS(SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads); 
 	
-	//CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome);
-	MERGE_VCF(SOMATIC_COMBINER.out.somatic_combiner_vcf.collect{it[2]}, params.num_threads) 
-	//VARIANT_ANNOTATION(MERGE_VCF.out.vcf_all, params.num_threads);
-	//MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect(), CONPAIR_CONTAMINATION.out.conpair_info.collect())
+	VARIANT_CALLING_STATS(SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads); 
+	CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome)
+	
+	MERGE_VCF(SOMATIC_COMBINER.out.somatic_combiner_vcf.collect{[it[1],it[2]]}, params.num_threads) 
+	VARIANT_ANNOTATION(MERGE_VCF.out.vcf_all, params.num_threads);
+	MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect(), CONPAIR_CONTAMINATION.out.conpair_info.collect())
 
 
 
