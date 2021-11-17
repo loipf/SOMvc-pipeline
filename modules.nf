@@ -13,7 +13,6 @@ process INDEX_REFERENCE {
 	input:
 		path reference_genome
 		path bed_file
-		path dbsnp_file
 
 	output:
 		tuple path("*.fa"), path("*.fa.fai"), path("*.dict"), emit: reference_genome
