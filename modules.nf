@@ -18,7 +18,6 @@ process INDEX_REFERENCE {
 	output:
 		tuple path("*.fa"), path("*.fa.fai"), path("*.dict"), emit: reference_genome
 		tuple path("*.bed_sorted.gz"), path("*.bed_sorted.gz.tbi"), emit: bed_file
-		tuple path("$dbsnp_file"), path("*.vcf.gz.tbi"), emit: dbsnp_file
 
 	shell:
 	'''
@@ -31,8 +30,6 @@ process INDEX_REFERENCE {
 
 	bedtools sort -i !{bed_file} | bgzip -c > !{bed_file}_sorted.gz
 	tabix --zero-based -b 2 -e 3 !{bed_file}_sorted.gz
-	
-	tabix !{dbsnp_file}
 	'''
 }
 
@@ -46,7 +43,6 @@ process SOMVC_LOFREQ {
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
-		path dbsnp_file
 		val num_threads
 
 	output:
@@ -68,7 +64,7 @@ process SOMVC_LOFREQ {
 	lofreq indelqual --dindel -f !{reference_genome[0]} -o tumor_file_indelqual.bam tumor_file_viterbi.bam
 	samtools index -b -@ !{num_threads} tumor_file_viterbi.bam
 
-	lofreq somatic -n normal_file_viterbi.bam -t tumor_file_viterbi.bam -f !{reference_genome[0]} --threads !{num_threads} -o lofreq_ -l bed_file_unzipped.bed --call-indels -d !{dbsnp_file[0]}
+	lofreq somatic -n normal_file_viterbi.bam -t tumor_file_viterbi.bam -f !{reference_genome[0]} --threads !{num_threads} -o lofreq_ -l bed_file_unzipped.bed --call-indels
 	
 	### vt normalization for indels
 	vt normalize lofreq_somatic_final.indels.vcf.gz -r !{reference_genome[0]} -o lofreq_somatic_final.indels_vt.vcf.gz
@@ -86,7 +82,6 @@ process SOMVC_MUTECT2 {
 		tuple val(sample_id), path(normal_file), path(tumor_file), path(normal_file_index), path(tumor_file_index) 
 		path reference_genome
 		path bed_file
-		path dbsnp_file
 		val num_threads
 
 	output:
@@ -102,9 +97,7 @@ process SOMVC_MUTECT2 {
 	gatk GetSampleName -I !{tumor_file} -O sample_tumor.txt
 	tumor_sample_name=$(cat sample_tumor.txt)
 	
-	#gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -normal $normal_sample_name -I !{tumor_file} -tumor $tumor_sample_name --native-pair-hmm-threads !{num_threads} --germline-resource /usr/src/mutect2_genome/af-only-gnomad.hg38.vcf.gz --panel-of-normals /usr/src/mutect2_genome/1000g_pon.hg38.vcf.gz --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
-	
-	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -normal $normal_sample_name -I !{tumor_file} -tumor $tumor_sample_name --native-pair-hmm-threads !{num_threads} --germline-resource !{dbsnp_file[0]} --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
+	gatk Mutect2 -R !{reference_genome[0]} -I !{normal_file} -normal $normal_sample_name -I !{tumor_file} -tumor $tumor_sample_name --native-pair-hmm-threads !{num_threads} --germline-resource /usr/src/mutect2_genome/af-only-gnomad_ensembl.hg38.vcf.gz --panel-of-normals /usr/src/mutect2_genome/1000g_pon_ensembl.hg38.vcf.gz --intervals bed_file_unzipped.bed -O mutect2_unfiltered.vcf
 	gatk FilterMutectCalls -R !{reference_genome[0]} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	### rename for somatic-combiner

@@ -47,10 +47,6 @@ params.scripts_dir	= "$params.project_dir/scripts"
 params.num_threads		= 3
 params.reference_genome	= "$params.project_dir/data/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
 params.bed_file	= "$params.project_dir/data/Homo_sapiens.GRCh38.cds.all.bed"
-params.dbsnp_file	= "$params.project_dir/data/dbsnp_154_hg38_renamed_COMMON.vcf.gz"
-
-
-params.vcf_test = "/home/stefanloipfinger/Desktop/vardict_output.vcf"
 
 
 
@@ -61,7 +57,6 @@ sample_match_file	: $params.sample_match_file
 data_dir		: $params.data_dir
 reference_genome	: $params.reference_genome
 bed_file		: $params.bed_file
-dbsnp_file		: $params.dbsnp_file
 
 ===================================================
 
@@ -84,10 +79,10 @@ workflow {
 	//channel_sample_match.view()
 
 
-	INDEX_REFERENCE(params.reference_genome, params.bed_file, params.dbsnp_file)
+	INDEX_REFERENCE(params.reference_genome, params.bed_file)
 
-	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file,INDEX_REFERENCE.out.dbsnp_file, params.num_threads)
-	SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file,INDEX_REFERENCE.out.dbsnp_file, params.num_threads)
+	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
+	SOMVC_MUTECT2(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
