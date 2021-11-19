@@ -8,7 +8,6 @@ params.data_dir	= "$launchDir/data"
 
 
 process INDEX_REFERENCE { 
-	publishDir "$params.data_dir", mode: "copy"
 
 	input:
 		path reference_genome
@@ -45,10 +44,11 @@ process SOMVC_LOFREQ {
 		val num_threads
 
 	output:
-		path "*"
 		tuple path ("lofreq_somatic_final.snvs.vcf.gz"), path("lofreq_somatic_final.snvs.vcf.gz.tbi"), emit: lofreq_snvs_vcf
 		tuple path ("lofreq_somatic_final.indels_vt.vcf.gz"), path("lofreq_somatic_final.indels_vt.vcf.gz.tbi"), emit: lofreq_indel_vcf
 		val "$sample_id", emit: lofreq_sample_id
+		tuple path ("lofreq_somatic_raw.snvs.vcf.gz"), path("lofreq_somatic_raw.snvs.vcf.gz.tbi")
+		tuple path ("lofreq_somatic_raw.indels.vcf.gz"), path("lofreq_somatic_raw.indels.vcf.gz.tbi")
 
 	shell:
 	'''
@@ -84,8 +84,8 @@ process SOMVC_MUTECT2 {
 		val num_threads
 
 	output:
-		path "*"
 		tuple path ("mutect2_filtered_vt.vcf.gz"), path("mutect2_filtered_vt.vcf.gz.tbi"), emit: mutect2_vcf
+		path "mutect2_filtered.vcf.filteringStats.tsv"
 
 	shell:
 	'''
@@ -100,7 +100,7 @@ process SOMVC_MUTECT2 {
 	gatk FilterMutectCalls -R !{reference_genome[0]} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	### rename for somatic-combiner
-	printf '%s\n' NORMAL TUMOR > sample_names.txt 
+	printf '%s\n' !{sample_id}_normal !{sample_id}_tumor > sample_names.txt  
 	bcftools reheader --samples sample_names.txt -o mutect2_filtered_name.vcf mutect2_filtered.vcf
 
 	bgzip -c mutect2_filtered_name.vcf > mutect2_filtered.vcf.gz
@@ -122,9 +122,9 @@ process SOMVC_STRELKA {
 		val num_threads
 
 	output:
-		path "*"
-		tuple path ("strelka_dir/results/variants/somatic.snvs.vcf.gz"), path("strelka_dir/results/variants/somatic.snvs.vcf.gz.tbi"), emit: strelka_snv_vcf
+		tuple path ("somatic.snvs.vcf.gz"), path("somatic.snvs.vcf.gz.tbi"), emit: strelka_snv_vcf
 		tuple path ("somatic.indels_vt.vcf.gz"), path("somatic.indels_vt.vcf.gz.tbi"), emit: strelka_indel_vcf
+		path manta_sv
 
 	shell:
 	'''
@@ -134,9 +134,17 @@ process SOMVC_STRELKA {
 	configureStrelkaSomaticWorkflow.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome[0]} --exome --runDir strelka_dir --indelCandidates manta_dir/results/variants/candidateSmallIndels.vcf.gz --callRegions !{bed_file[0]}
 	strelka_dir/runWorkflow.py -m local -j !{num_threads}
 
+	printf '%s\n' !{sample_id}_normal !{sample_id}_tumor > sample_names.txt 
+	bcftools reheader --samples sample_names.txt -o somatic.snvs.vcf.gz strelka_dir/results/variants/somatic.snvs.vcf.gz
+	bcftools reheader --samples sample_names.txt -o somatic.indels.vcf.gz strelka_dir/results/variants/somatic.indels.vcf.gz
+	tabix -p vcf somatic.snvs.vcf.gz
+
 	### vt normalization for indels
-	vt normalize strelka_dir/results/variants/somatic.indels.vcf.gz -r !{reference_genome[0]} -o somatic.indels_vt.vcf.gz
+	vt normalize somatic.indels.vcf.gz -r !{reference_genome[0]} -o somatic.indels_vt.vcf.gz
 	tabix -p vcf somatic.indels_vt.vcf.gz
+	
+	mv manta_dir/results/variants manta_sv
+	
 	'''
 }
 
@@ -152,19 +160,19 @@ process SOMVC_VARDICT {
 		val num_threads
 
 	output:
-		path "*"
-		path "vardict_output_filtered.vcf", emit: vardict_snv_vcf
-
+		tuple path("vardict_output_filtered.vcf.gz"), path("vardict_output_filtered.vcf.gz.tbi"), emit: vardict_snv_vcf
 
 	shell: 
 	'''
 	gunzip -c !{bed_file[0]} > bed_file_unzipped.bed   # vardict need unzipped
 
-	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome[0]} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} bed_file_unzipped.bed | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "tumor_sample|normal_sample" > vardict_output.vcf
+	/usr/src/VarDict-1.8.2/bin/VarDict -G !{reference_genome[0]} -k 1 -b "!{tumor_file}|!{normal_file}" -Q 5 -z 1 -c 1 -S 2 -E 3 -g 4 -th !{num_threads} bed_file_unzipped.bed | /usr/src/VarDict-1.8.2/bin/testsomatic.R | /usr/src/VarDict-1.8.2/bin/var2vcf_paired.pl -P 0.9 -m 4.25 -f 0.01 -M -N "!{sample_id}_tumor|!{sample_id}_normal" > vardict_output.vcf
 
 	### https://github.com/bcbio/bcbio-nextgen/blob/5cfc02b5974d19908702fa21e6d2f7a50455b44c/bcbio/variation/vardict.py#L248
 	gatk VariantFiltration -R !{reference_genome[0]} -V vardict_output.vcf -O vardict_output_filtered.vcf --filter-name bcbio_advised --filter-expression "((AF*DP<6)&&((MQ<55.0&&NM>1.0)||(MQ<60.0&&NM>2.0)||(DP<10)||(QUAL<45)))" 
 
+	bgzip -c vardict_output_filtered.vcf > vardict_output_filtered.vcf.gz
+	tabix -p vcf vardict_output_filtered.vcf.gz
 	'''
 }
 
