@@ -202,6 +202,9 @@ process SOMATIC_COMBINER {
 	printf '%s\n' !{sample_id}_tumor !{sample_id}_normal > sample_names.txt 
 	bcftools reheader --samples sample_names.txt -o somatic_combiner_sample.vcf somatic_combiner_raw.vcf
 	
+	### somatic combiner defined but not added to vcf
+	sed -i '7 i ##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">' somatic_combiner_sample.vcf
+	
 	bgzip -c somatic_combiner_sample.vcf > !{sample_id}_somatic_combiner_all.vcf.gz
 	tabix -p vcf !{sample_id}_somatic_combiner_all.vcf.gz
 	'''
@@ -251,11 +254,12 @@ process VARIANT_CALLING_STATS {
 		val num_threads
 
 	output:
-		path "${sample_id}_vcfstats.txt", emit: vcf_stats
+		path "*_ADJ_PASS_vcfstats.txt", emit: vcf_stats
 
 	shell:
 	'''
-	bcftools stats -f ADJ_PASS --threads !{num_threads} !{vcf_file} > !{sample_id}_vcfstats.txt
+	bcftools stats -f ADJ_PASS -s !{sample_id}_normal --threads !{num_threads} !{vcf_file} > !{sample_id}_normal_ADJ_PASS_vcfstats.txt
+	bcftools stats -f ADJ_PASS -s !{sample_id}_tumor --threads !{num_threads} !{vcf_file} > !{sample_id}_tumor_ADJ_PASS_vcfstats.txt
 	'''
 }
 
@@ -274,7 +278,6 @@ process MERGE_VCF {
 	shell:
 	'''
 	bcftools merge -Oz -o all_samples_vcf_merged.vcf.gz --threads !{num_threads} *_somatic_combiner_all.vcf.gz
-	
 	'''
 }
 
