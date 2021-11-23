@@ -34,10 +34,10 @@ include {
 
 params.dev_samples = -1
 
-params.project_dir	= "$projectDir"
+params.project_dir		= "$projectDir"
 params.sample_match_file	= "$params.project_dir/normal_tumor_pairs.csv"
 params.data_dir		= "$params.project_dir/data"
-params.scripts_dir	= "$params.project_dir/scripts"
+params.scripts_dir		= "$params.project_dir/scripts"
 
 
 /*
@@ -46,7 +46,7 @@ params.scripts_dir	= "$params.project_dir/scripts"
 
 params.num_threads		= 3
 params.reference_genome	= "$params.project_dir/data/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
-params.bed_file	= "$params.project_dir/data/Homo_sapiens.GRCh38.cds.all.bed"
+params.bed_file		= "$params.project_dir/data/Homo_sapiens.GRCh38.cds.all.bed"
 
 
 
@@ -78,7 +78,6 @@ workflow {
 			.take( params.dev_samples )  // only consider a few files for debugging
 	//channel_sample_match.view()
 
-
 	INDEX_REFERENCE(params.reference_genome, params.bed_file)
 
 	SOMVC_LOFREQ(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
@@ -86,7 +85,11 @@ workflow {
 	SOMVC_STRELKA(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 	SOMVC_VARDICT(channel_sample_match, INDEX_REFERENCE.out.reference_genome, INDEX_REFERENCE.out.bed_file, params.num_threads)
 
-	SOMATIC_COMBINER(SOMVC_LOFREQ.out.lofreq_sample_id, SOMVC_LOFREQ.out.lofreq_indel_vcf, SOMVC_LOFREQ.out.lofreq_snvs_vcf, SOMVC_MUTECT2.out.mutect2_vcf, SOMVC_STRELKA.out.strelka_indel_vcf, SOMVC_STRELKA.out.strelka_snv_vcf, SOMVC_VARDICT.out.vardict_snv_vcf)
+	channel_all_vc = SOMVC_LOFREQ.out.lofreq_output
+			.join(SOMVC_MUTECT2.out.mutect2_output, by: 0)
+			.join(SOMVC_STRELKA.out.strelka_output, by: 0)
+			.join(SOMVC_VARDICT.out.vardict_output, by: 0)
+	SOMATIC_COMBINER(channel_all_vc)
 	
 	VARIANT_CALLING_STATS(SOMATIC_COMBINER.out.somatic_combiner_vcf, params.num_threads); 
 	CONPAIR_CONTAMINATION(channel_sample_match, INDEX_REFERENCE.out.reference_genome)
@@ -95,22 +98,12 @@ workflow {
 	VARIANT_ANNOTATION(MERGE_VCF.out.vcf_all, params.num_threads);
 	MULTIQC_VCF(VARIANT_CALLING_STATS.out.vcf_stats.collect(), CONPAIR_CONTAMINATION.out.conpair_info.collect())
 
-
-
-
-
 }
-
 
 
 
 workflow.onComplete { 
 	println ( workflow.success ? "\ndone! check the quality reports in --> $params.data_dir/quality_reports\n" : "oops .. something went wrong" ) } 
-
-
-// ~/tools/nextflow run main.nf --project_dir ../somatic_test/ --reference_genome /home/stefan/Documents/umcg/somatic_test/data/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
-
-
 
 
 

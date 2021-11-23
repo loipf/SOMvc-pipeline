@@ -44,11 +44,9 @@ process SOMVC_LOFREQ {
 		val num_threads
 
 	output:
-		tuple path ("lofreq_somatic_final.snvs.vcf.gz"), path("lofreq_somatic_final.snvs.vcf.gz.tbi"), emit: lofreq_snvs_vcf
-		tuple path ("lofreq_somatic_final.indels_vt.vcf.gz"), path("lofreq_somatic_final.indels_vt.vcf.gz.tbi"), emit: lofreq_indel_vcf
-		val "$sample_id", emit: lofreq_sample_id
-		tuple path ("lofreq_somatic_raw.snvs.vcf.gz"), path("lofreq_somatic_raw.snvs.vcf.gz.tbi")
-		tuple path ("lofreq_somatic_raw.indels.vcf.gz"), path("lofreq_somatic_raw.indels.vcf.gz.tbi")
+		tuple val("$sample_id"), path("lofreq_somatic_final.snvs.vcf.gz"), path("lofreq_somatic_final.snvs.vcf.gz.tbi"), path("lofreq_somatic_final.indels_vt.vcf.gz"), path("lofreq_somatic_final.indels_vt.vcf.gz.tbi"), emit: lofreq_output
+		tuple path("lofreq_somatic_raw.snvs.vcf.gz"), path("lofreq_somatic_raw.snvs.vcf.gz.tbi")
+		tuple path("lofreq_somatic_raw.indels.vcf.gz"), path("lofreq_somatic_raw.indels.vcf.gz.tbi")
 
 	shell:
 	'''
@@ -84,7 +82,7 @@ process SOMVC_MUTECT2 {
 		val num_threads
 
 	output:
-		tuple path ("mutect2_filtered_vt.vcf.gz"), path("mutect2_filtered_vt.vcf.gz.tbi"), emit: mutect2_vcf
+		tuple val("$sample_id"), path("mutect2_filtered_vt.vcf.gz"), path("mutect2_filtered_vt.vcf.gz.tbi"), emit: mutect2_output
 		path "mutect2_filtered.vcf.filteringStats.tsv"
 
 	shell:
@@ -122,8 +120,7 @@ process SOMVC_STRELKA {
 		val num_threads
 
 	output:
-		tuple path ("somatic.snvs.vcf.gz"), path("somatic.snvs.vcf.gz.tbi"), emit: strelka_snv_vcf
-		tuple path ("somatic.indels_vt.vcf.gz"), path("somatic.indels_vt.vcf.gz.tbi"), emit: strelka_indel_vcf
+		tuple val("$sample_id"), path("somatic.snvs.vcf.gz"), path("somatic.snvs.vcf.gz.tbi"), path("somatic.indels_vt.vcf.gz"), path("somatic.indels_vt.vcf.gz.tbi"), emit: strelka_output
 		path manta_sv
 
 	shell:
@@ -144,7 +141,6 @@ process SOMVC_STRELKA {
 	tabix -p vcf somatic.indels_vt.vcf.gz
 	
 	mv manta_dir/results/variants manta_sv
-	
 	'''
 }
 
@@ -160,7 +156,7 @@ process SOMVC_VARDICT {
 		val num_threads
 
 	output:
-		tuple path("vardict_output_filtered.vcf.gz"), path("vardict_output_filtered.vcf.gz.tbi"), emit: vardict_snv_vcf
+		tuple val("$sample_id"), path("vardict_output_filtered.vcf.gz"), path("vardict_output_filtered.vcf.gz.tbi"), emit: vardict_output
 
 	shell: 
 	'''
@@ -183,16 +179,10 @@ process SOMATIC_COMBINER {
 	publishDir "$params.data_dir/vc_caller/somatic_combiner", mode: 'copy', saveAs: { filename -> "${sample_id}/$filename" }
 
 	input:
-		val sample_id
-		path lofreq_indel_vcf
-		path lofreq_snv_vcf
-		path mutect2_vcf
-		path strelka_indel_vcf
-		path strelka_snv_vcf
-		path vardict_vcf
+		tuple val(sample_id), path(lofreq_snv_vcf), path(lofreq_snv_vcf_index), path(lofreq_indel_vcf), path(lofreq_indel_vcf_index), path(mutect2_vcf), path(mutect2_vcf_index), path(strelka_snv_vcf), path(strelka_snv_vcf_index), path(strelka_indel_vcf), path(strelka_indel_vcf_index), path(vardict_vcf), path(vardict_vcf_index)
 
 	output:
-		tuple val("${sample_id}"), path ("*_somatic_combiner_all.vcf.gz"), path ("*_somatic_combiner_all.vcf.gz.tbi"), emit: somatic_combiner_vcf
+		tuple val("${sample_id}"), path("*_somatic_combiner_all.vcf.gz"), path("*_somatic_combiner_all.vcf.gz.tbi"), emit: somatic_combiner_vcf
 
 
 	shell:
@@ -203,7 +193,7 @@ process SOMATIC_COMBINER {
 	bcftools reheader --samples sample_names.txt -o somatic_combiner_sample.vcf somatic_combiner_raw.vcf
 	
 	### somatic combiner defined but not added to vcf
-	sed -i '7 i ##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">' somatic_combiner_sample.vcf
+	sed -i '7 i ##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed, according to somatic-combiner">' somatic_combiner_sample.vcf
 	
 	bgzip -c somatic_combiner_sample.vcf > !{sample_id}_somatic_combiner_all.vcf.gz
 	tabix -p vcf !{sample_id}_somatic_combiner_all.vcf.gz
@@ -231,7 +221,6 @@ process CONPAIR_CONTAMINATION {
 
 	MARKER_FILE_TXT="/usr/src/conpair/conpair/markers/GRCh38.autosomes.phase3_shapeit2_mvncall_integrated.20130502.SNV.genotype.sselect_v4_MAF_0.4_LD_0.8.liftover.txt"
 	sed -e 's/chr//g' $MARKER_FILE_TXT > markers_GRCh38_snv_formatted.txt  ### rename chromosomes
-
 
 	run_gatk_pileup_for_sample.py -B !{tumor_file} -O tumor_pileup --reference !{reference_genome[0]} --conpair_dir /usr/src/conpair/ --markers markers_GRCh38_snv_formatted.bed
 	run_gatk_pileup_for_sample.py -B !{normal_file} -O normal_pileup --reference !{reference_genome[0]} --conpair_dir /usr/src/conpair/ --markers markers_GRCh38_snv_formatted.bed
