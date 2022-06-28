@@ -98,7 +98,7 @@ process SOMVC_MUTECT2 {
 	gatk FilterMutectCalls -R !{reference_genome[0]} -V mutect2_unfiltered.vcf -O mutect2_filtered.vcf
 
 	### rename for somatic-combiner
-	printf '%s\n' !{sample_id}_normal !{sample_id}_tumor > sample_names.txt  
+	printf '%s\n' "$normal_sample_name !{sample_id}_normal" "$tumor_sample_name !{sample_id}_tumor" > sample_names.txt 
 	bcftools reheader --samples sample_names.txt -o mutect2_filtered_name.vcf mutect2_filtered.vcf
 
 	bgzip -c mutect2_filtered_name.vcf > mutect2_filtered.vcf.gz
@@ -131,7 +131,7 @@ process SOMVC_STRELKA {
 	configureStrelkaSomaticWorkflow.py --tumorBam !{tumor_file} --normalBam !{normal_file} --referenceFasta !{reference_genome[0]} --exome --runDir strelka_dir --indelCandidates manta_dir/results/variants/candidateSmallIndels.vcf.gz --callRegions !{bed_file[0]}
 	strelka_dir/runWorkflow.py -m local -j !{num_threads}
 
-	printf '%s\n' !{sample_id}_normal !{sample_id}_tumor > sample_names.txt 
+	printf '%s\n' "NORMAL !{sample_id}_normal" "TUMOR !{sample_id}_tumor" > sample_names.txt 
 	bcftools reheader --samples sample_names.txt -o somatic.snvs.vcf.gz strelka_dir/results/variants/somatic.snvs.vcf.gz
 	bcftools reheader --samples sample_names.txt -o somatic.indels.vcf.gz strelka_dir/results/variants/somatic.indels.vcf.gz
 	tabix -p vcf somatic.snvs.vcf.gz
