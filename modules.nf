@@ -189,7 +189,7 @@ process SOMATIC_COMBINER {
 	'''
 	java -jar /usr/src/somaticCombiner.jar -L !{lofreq_indel_vcf} -l !{lofreq_snv_vcf} -M !{mutect2_vcf} -s !{strelka_snv_vcf} -S !{strelka_indel_vcf} -D !{vardict_vcf} -o somatic_combiner_raw.vcf
 
-	printf '%s\n' !{sample_id}_tumor !{sample_id}_normal > sample_names.txt 
+	printf '%s\n' "TUMOR !{sample_id}_tumor" "NORMAL !{sample_id}_normal" > sample_names.txt
 	bcftools reheader --samples sample_names.txt -o somatic_combiner_sample.vcf somatic_combiner_raw.vcf
 	
 	### somatic combiner defined but not added to vcf
