@@ -1,8 +1,8 @@
 
 ############################################
-### create bed file
+### check maftools
 
-#setwd(dirname(rstudioapi::getSourceEditorContext()$path))   ### only in RStudio
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))   ### only in RStudio
 
 source("https://raw.githubusercontent.com/loipf/coding_snippets/master/R/small_functions.R")
 
@@ -27,8 +27,8 @@ s
 ############################################
 ### combine bed segments
 
-bed <- 'Homo_sapiens.GRCh38.exons.101.bed'
-# bed <- 'Homo_sapiens.GRCh38.exons.101.squeezed.bed'
+bed <- '/home/stefanloipfinger/Desktop/other/bed_file_test/Homo_sapiens.GRCh38.exons.101.bed'
+# bed <- '/home/stefanloipfinger/Desktop/other/bed_file_test/Homo_sapiens.GRCh38.exons.101.squeezed.bed'
 
 ### filter for transcript_support_level==1 like in martens?
 bed.df <- fread(bed) %>% as.data.frame()
@@ -62,10 +62,10 @@ width(bed.gr.reduced_tidy) %>% sum()  ## 1265712403
 
 bed_reduced_tidy_bed = data.frame(bed.gr.reduced_tidy)
 
+### remove pieces with length 1
+bed_reduced_tidy_bed = bed_reduced_tidy_bed[bed_reduced_tidy_bed$width>1,]
+
 fwrite(bed_reduced_tidy_bed, paste0(basename_core(bed, with_path = T),'.squeezed.bed'), sep = '\t', col.names = F)
-
-
-
 
 
 
